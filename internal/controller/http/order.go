@@ -3,7 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/sreway/gophermart/internal/entity"
@@ -25,7 +25,7 @@ func (or *orderRoutes) orderAdd(w http.ResponseWriter, r *http.Request) {
 	userID := uint(r.Context().Value(userIDKey).(float64))
 	userLogin := r.Context().Value(userLoginKey).(string)
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Error(err)
 		HandelErrOrder(w, entity.ErrOrderIncorrectData)

@@ -12,6 +12,7 @@ import (
 	"github.com/sreway/gophermart/internal/usecase/accrual"
 	"github.com/sreway/gophermart/internal/usecase/repo"
 	"github.com/sreway/gophermart/pkg/httpclient"
+	"github.com/sreway/gophermart/pkg/kafkaclient"
 	"github.com/sreway/gophermart/pkg/logger"
 	"github.com/sreway/gophermart/pkg/postgres"
 )
@@ -44,7 +45,7 @@ func NewOrderStack() *Stack {
 
 func orderListner(ctx context.Context, wg *sync.WaitGroup, pg *postgres.Postgres, cfg *config.Config, data chan<- string) {
 	defer func() {
-		logger.Info("Stop OrderListner")
+		logger.Info("Stop orderListner")
 		wg.Done()
 	}()
 	pgl, err := listener.NewPgListner(ctx, pg, cfg.Postgres.ListenChannel)
@@ -56,24 +57,33 @@ func orderListner(ctx context.Context, wg *sync.WaitGroup, pg *postgres.Postgres
 	pgl.Listen(ctx, data)
 }
 
-func storeOrderInStack(ctx context.Context, wg *sync.WaitGroup, q *Stack, data chan string) {
+func storeOrderInKafka(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config, data <-chan string) {
 	defer func() {
-		logger.Info("Stop storeOrderInStack")
+		logger.Info("Stop storeOrderInKafka")
 		wg.Done()
 	}()
+
+	producer, err := kafkaclient.NewProducer(ctx, cfg.Kafka.BrokerNetwork, cfg.Kafka.BrokerAddress,
+		cfg.Kafka.Topic, cfg.Kafka.Partition)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	defer producer.Close()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case orderNumber := <-data:
-			q.Put(orderNumber)
+			err = producer.Write(orderNumber)
+			if err != nil {
+				logger.Error(err)
+			}
 		}
 	}
 }
 
-func processingOrder(ctx context.Context, wg *sync.WaitGroup,
-	pg *postgres.Postgres, cfg *config.Config, q *Stack,
-) {
+func processingOrder(ctx context.Context, wg *sync.WaitGroup, pg *postgres.Postgres, cfg *config.Config) {
 	defer func() {
 		logger.Info("Stop processingOrder")
 		wg.Done()
@@ -84,29 +94,38 @@ func processingOrder(ctx context.Context, wg *sync.WaitGroup,
 	ar := repo.NewAccrualRepo(hc.Client)
 	ac := accrual.New(ar, or)
 
+	consumer := kafkaclient.NewConsumer(cfg.Kafka.BrokerAddress, cfg.Kafka.Topic, cfg.Kafka.GroupID)
+	defer consumer.Close()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			orderNumber := q.Get()
-			if orderNumber == nil {
+			msg, err := consumer.Read(ctx)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				logger.Error(err)
 				continue
 			}
-			a, err := ac.Get(ctx, *orderNumber)
+
+			if msg == nil {
+				continue
+			}
+
+			a, err := ac.Get(ctx, string(msg.Value))
 			if err != nil {
 				var rateLimitedError *entity.ErrRateLimited
 				var httpClientError *entity.ErrHTTPClient
 
 				switch {
 				case errors.As(err, &rateLimitedError):
-					// return to queue
-					q.Put(*orderNumber)
 					logger.Error(rateLimitedError)
 					time.Sleep(rateLimitedError.RetryAfter)
 					continue
 				case errors.As(err, &httpClientError):
-					q.Put(*orderNumber)
 					logger.Error(httpClientError)
 					continue
 				}
@@ -114,18 +133,19 @@ func processingOrder(ctx context.Context, wg *sync.WaitGroup,
 
 			err = ac.UpdateOrderStatus(ctx, a)
 			if err != nil {
-				// return to queue
-				q.Put(*orderNumber)
 				logger.Error(err)
 				continue
 			}
 
 			switch entity.OrderStatus(a.Status) {
 			case entity.OrderStatusInvalid, entity.OrdertStatusProcessed:
-				logger.Infof("Success processed order %s", *orderNumber)
+				logger.Infof("Success processed order %s", string(msg.Value))
 			default:
-				// return to queue
-				q.Put(*orderNumber)
+				err = consumer.Commit(ctx, msg)
+				if err != nil {
+					logger.Error(err)
+					continue
+				}
 			}
 		}
 	}

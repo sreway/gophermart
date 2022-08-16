@@ -61,13 +61,12 @@ func Run(cfg *config.Config) {
 
 	// run listen new order from postgres
 	go orderListner(ctx, wg, pg, cfg, newOrdersChannel)
-	q := NewOrderStack()
 
-	// store order in stack
-	go storeOrderInStack(ctx, wg, q, newOrdersChannel)
+	// store order in kafka queue
+	go storeOrderInKafka(ctx, wg, cfg, newOrdersChannel)
 
 	// processing orders
-	go processingOrder(ctx, wg, pg, cfg, q)
+	go processingOrder(ctx, wg, pg, cfg)
 
 	// listen system signals for graceful shutdown
 	go func() {

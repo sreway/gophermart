@@ -20,6 +20,11 @@ var (
 	DefaultPostgresListenChannel = "new_order"
 	DefaultJWTKey                = "some_secret" // not set as default, need move env
 	DefaultJWTLiveTime           = 30 * time.Minute
+	DefaultKafkaBrokerAddress    = "188.124.39.147:9092"
+	DefaultKafkaTopic            = "new_order"
+	DefaultKafkaPartition        = 0
+	DefaultKafkaBrokerNetwork    = "tcp"
+	DefaultKafkaGroupID          = "gophermart"
 )
 
 type (
@@ -27,6 +32,7 @@ type (
 		Server   ServerConfig
 		Postgres PostgresConfig
 		Accrual  AccrualConfig
+		Kafka    KafkaConfig
 	}
 
 	ServerConfig struct {
@@ -58,6 +64,14 @@ type (
 	AccrualConfig struct {
 		Address string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	}
+
+	KafkaConfig struct {
+		BrokerAddress string `env:"KAFKA_BROKER_ADDRESS"`
+		BrokerNetwork string `env:"KAFKA_BROKER_NETWORK"`
+		Topic         string `env:"KAFKA_TOPIC"`
+		Partition     int    `env:"KAFKA_PARTITION"`
+		GroupID       string `env:"KAFKA_GROUP_ID"`
+	}
 )
 
 func NewConfig() (*Config, error) {
@@ -82,6 +96,14 @@ func NewConfig() (*Config, error) {
 		},
 		Accrual: AccrualConfig{
 			Address: DefaultAccrualAddress,
+		},
+
+		Kafka: KafkaConfig{
+			BrokerAddress: DefaultKafkaBrokerAddress,
+			BrokerNetwork: DefaultKafkaBrokerNetwork,
+			Topic:         DefaultKafkaTopic,
+			Partition:     DefaultKafkaPartition,
+			GroupID:       DefaultKafkaGroupID,
 		},
 	}
 
