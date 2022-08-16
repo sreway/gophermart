@@ -1,0 +1,10 @@
+BEGIN;
+
+CREATE TYPE OrderStatus AS ENUM (
+    'NEW',
+    'PROCESSING',
+    'INVALID',
+    'PROCESSED'
+);
+
+COMMIT;
