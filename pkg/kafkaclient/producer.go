@@ -2,6 +2,7 @@ package kafkaclient
 
 import (
 	"context"
+
 	"github.com/segmentio/kafka-go"
 
 	"github.com/sreway/gophermart/pkg/logger"

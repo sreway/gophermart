@@ -55,4 +55,10 @@ type (
 	AccrualRepo interface {
 		Get(ctx context.Context, number string) (*entity.Accrual, error)
 	}
+
+	QueueRepo interface {
+		Add(ctx context.Context, number string) error
+		Read(ctx context.Context) (string, error)
+		Commit(ctx context.Context, msg *entity.QueueMsg) error
+	}
 )
