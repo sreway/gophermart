@@ -78,7 +78,7 @@ func Run(cfg *config.Config) {
 	}(cfg, pg, systemSignals)
 
 	// run listen new order from postgres
-	go orderListner(ctx, wg, pg, cfg, newOrdersChannel)
+	go orderListener(ctx, wg, pg, cfg, newOrdersChannel)
 
 	// store order in kafka queue
 	go storeOrderQueue(ctx, wg, oq, newOrdersChannel)

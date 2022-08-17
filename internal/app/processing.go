@@ -15,9 +15,9 @@ import (
 	"github.com/sreway/gophermart/pkg/postgres"
 )
 
-func orderListner(ctx context.Context, wg *sync.WaitGroup, pg *postgres.Postgres, cfg *config.Config, data chan<- string) {
+func orderListener(ctx context.Context, wg *sync.WaitGroup, pg *postgres.Postgres, cfg *config.Config, data chan<- string) {
 	defer func() {
-		logger.Info("Stop orderListner")
+		logger.Info("Stop orderListener")
 		wg.Done()
 	}()
 	pgl, err := listener.NewPgListner(ctx, pg, cfg.Postgres.ListenChannel)
