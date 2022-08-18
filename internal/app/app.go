@@ -50,7 +50,7 @@ func Run(cfg *config.Config) {
 
 	oq := repo.NewQueueRepo(producer, consumer)
 	or := repo.NewOrderRepo(pg)
-	ar := repo.NewAccrualRepo(hc.Client)
+	ar := repo.NewAccrualRepo(hc)
 	ac := accrual.New(ar, or)
 
 	wg := new(sync.WaitGroup)

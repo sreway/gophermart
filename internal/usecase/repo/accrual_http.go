@@ -7,16 +7,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-resty/resty/v2"
-
 	"github.com/sreway/gophermart/internal/entity"
+	"github.com/sreway/gophermart/pkg/httpclient"
 )
 
 type AccrualRepo struct {
-	*resty.Client
+	*httpclient.Client
 }
 
-func NewAccrualRepo(c *resty.Client) *AccrualRepo {
+func NewAccrualRepo(c *httpclient.Client) *AccrualRepo {
 	return &AccrualRepo{c}
 }
 
