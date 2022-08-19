@@ -56,9 +56,15 @@ type (
 		Get(ctx context.Context, number string) (*entity.Accrual, error)
 	}
 
+	Queue interface {
+		Add(ctx context.Context, number string) error
+		Read(ctx context.Context) (*entity.QueueMsg, error)
+		Commit(ctx context.Context, msg *entity.QueueMsg) error
+	}
+
 	QueueRepo interface {
 		Add(ctx context.Context, number string) error
-		Read(ctx context.Context) (string, error)
+		Read(ctx context.Context) (*entity.QueueMsg, error)
 		Commit(ctx context.Context, msg *entity.QueueMsg) error
 	}
 )

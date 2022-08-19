@@ -1,46 +1,34 @@
-package app
+package processing
 
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
-	"github.com/sreway/gophermart/config"
-	"github.com/sreway/gophermart/internal/controller/listener"
 	"github.com/sreway/gophermart/internal/entity"
-	"github.com/sreway/gophermart/internal/usecase/accrual"
-	"github.com/sreway/gophermart/internal/usecase/repo"
+	"github.com/sreway/gophermart/internal/usecase"
 	"github.com/sreway/gophermart/pkg/logger"
-	"github.com/sreway/gophermart/pkg/postgres"
 )
 
-func orderListener(ctx context.Context, wg *sync.WaitGroup, pg *postgres.Postgres, cfg *config.Config, data chan<- string) {
-	defer func() {
-		logger.Info("Stop orderListener")
-		wg.Done()
-	}()
-	pgl, err := listener.NewPgListner(ctx, pg, cfg.Postgres.ListenChannel)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer pgl.Release()
-
-	pgl.Listen(ctx, data)
+type Orders struct {
+	queue   usecase.Queue
+	accrual usecase.Accrual
 }
 
-func storeOrderQueue(ctx context.Context, wg *sync.WaitGroup, oq *repo.QueueRepo, data <-chan string) {
-	defer func() {
-		logger.Info("Stop storeOrderInKafka")
-		wg.Done()
-	}()
+func NewOrders(q usecase.Queue, a usecase.Accrual) (*Orders, error) {
+	return &Orders{
+		queue:   q,
+		accrual: a,
+	}, nil
+}
 
+func (po *Orders) SendToQueue(ctx context.Context, data <-chan string) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case orderNumber := <-data:
-			err := oq.Store(orderNumber)
+			err := po.queue.Add(ctx, orderNumber)
 			if err != nil {
 				logger.Error(err)
 			}
@@ -48,18 +36,13 @@ func storeOrderQueue(ctx context.Context, wg *sync.WaitGroup, oq *repo.QueueRepo
 	}
 }
 
-func processingOrder(ctx context.Context, wg *sync.WaitGroup, ac *accrual.Accrual, oq *repo.QueueRepo) {
-	defer func() {
-		logger.Info("Stop processingOrder")
-		wg.Done()
-	}()
-
+func (po *Orders) CheckInAccrual(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			msg, err := oq.Read(ctx)
+			msg, err := po.queue.Read(ctx)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return
@@ -72,7 +55,7 @@ func processingOrder(ctx context.Context, wg *sync.WaitGroup, ac *accrual.Accrua
 				continue
 			}
 
-			a, err := ac.Get(ctx, string(msg.Value))
+			a, err := po.accrual.Get(ctx, string(msg.Value))
 			if err != nil {
 				var rateLimitedError *entity.ErrRateLimited
 				var httpClientError *entity.ErrHTTPClient
@@ -88,7 +71,7 @@ func processingOrder(ctx context.Context, wg *sync.WaitGroup, ac *accrual.Accrua
 				}
 			}
 
-			err = ac.UpdateOrderStatus(ctx, a)
+			err = po.accrual.UpdateOrderStatus(ctx, a)
 			if err != nil {
 				logger.Error(err)
 				continue
@@ -98,7 +81,7 @@ func processingOrder(ctx context.Context, wg *sync.WaitGroup, ac *accrual.Accrua
 			case entity.OrderStatusInvalid, entity.OrdertStatusProcessed:
 				logger.Infof("Success processed order %s", string(msg.Value))
 			default:
-				err = oq.Commit(ctx, msg)
+				err = po.queue.Commit(ctx, msg)
 				if err != nil {
 					logger.Error(err)
 					continue

@@ -7,6 +7,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/sreway/gophermart/internal/controller/listener"
+	"github.com/sreway/gophermart/internal/controller/processing"
+
 	"github.com/sreway/gophermart/internal/usecase/accrual"
 	"github.com/sreway/gophermart/pkg/httpclient"
 	"github.com/sreway/gophermart/pkg/kafkaclient"
@@ -17,6 +20,7 @@ import (
 	"github.com/sreway/gophermart/internal/controller/http"
 	"github.com/sreway/gophermart/internal/usecase/balance"
 	"github.com/sreway/gophermart/internal/usecase/order"
+	"github.com/sreway/gophermart/internal/usecase/queue"
 	"github.com/sreway/gophermart/internal/usecase/repo"
 	"github.com/sreway/gophermart/internal/usecase/user"
 	"github.com/sreway/gophermart/internal/usecase/withdraw"
@@ -31,8 +35,16 @@ func Run(cfg *config.Config) {
 	systemSignals := make(chan os.Signal, 1)
 	signal.Notify(systemSignals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	exitChan := make(chan int)
+	newOrdersChan := make(chan string)
+
+	hc := httpclient.New(httpclient.WithBaseURL(cfg.Accrual.Address))
 
 	pg, err := postgres.New(ctx, cfg.Postgres.DSN)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	pgl, err := listener.NewPGListener(ctx, pg, cfg.Postgres.ListenChannel)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -45,26 +57,30 @@ func Run(cfg *config.Config) {
 
 	consumer := kafkaclient.NewConsumer(cfg.Kafka.BrokerAddress, cfg.Kafka.Topic, cfg.Kafka.GroupID)
 
-	newOrdersChannel := make(chan string)
-	hc := httpclient.New(httpclient.WithBaseURL(cfg.Accrual.Address))
-
-	oq := repo.NewQueueRepo(producer, consumer)
 	or := repo.NewOrderRepo(pg)
 	ar := repo.NewAccrualRepo(hc)
+	ur := repo.NewUserRepo(pg)
+	br := repo.NewBalanceRepo(pg)
+	wr := repo.NewWithdraw(pg)
+	qr := repo.NewQueueRepo(producer, consumer)
+
+	uc := user.New(ur)
+	oc := order.New(or)
+	bc := balance.New(br)
+	wc := withdraw.New(wr)
 	ac := accrual.New(ar, or)
+	qc := queue.New(qr)
+
+	pc, err := processing.NewOrders(qc, ac)
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	wg := new(sync.WaitGroup)
 	wg.Add(3)
 
 	// run http server
-	go func(cfg *config.Config, pg *postgres.Postgres, stop chan os.Signal) {
-		ur := repo.NewUserRepo(pg)
-		br := repo.NewBalanceRepo(pg)
-		wr := repo.NewWithdraw(pg)
-		uc := user.New(ur)
-		oc := order.New(or)
-		bc := balance.New(br)
-		wc := withdraw.New(wr)
+	go func(cfg *config.Config, stop chan os.Signal) {
 		r := chi.NewRouter()
 		jwt := auth.New(cfg.Server.Auth.JWT.Key, cfg.Server.Auth.JWT.TokenTTL)
 		http.NewRouter(r, cfg, jwt, uc, oc, bc, wc)
@@ -75,16 +91,25 @@ func Run(cfg *config.Config) {
 			stop <- syscall.SIGSTOP
 			return
 		}
-	}(cfg, pg, systemSignals)
+	}(cfg, systemSignals)
 
 	// run listen new order from postgres
-	go orderListener(ctx, wg, pg, cfg, newOrdersChannel)
+	go func() {
+		defer wg.Done()
+		pgl.Listen(ctx, newOrdersChan)
+	}()
 
-	// store order in kafka queue
-	go storeOrderQueue(ctx, wg, oq, newOrdersChannel)
+	// send new order in kafka queue
+	go func() {
+		defer wg.Done()
+		pc.SendToQueue(ctx, newOrdersChan)
+	}()
 
-	// processing orders
-	go processingOrder(ctx, wg, ac, oq)
+	// processing new order in accrual service
+	go func() {
+		defer wg.Done()
+		pc.CheckInAccrual(ctx)
+	}()
 
 	// listen system signals for graceful shutdown
 	go func() {
@@ -104,6 +129,7 @@ func Run(cfg *config.Config) {
 	exitCode := <-exitChan
 	cancel()
 	wg.Wait()
+	pgl.Release()
 	pg.Close()
 	producer.Close()
 	consumer.Close()

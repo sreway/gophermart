@@ -9,12 +9,12 @@ import (
 	"github.com/sreway/gophermart/pkg/postgres"
 )
 
-type PgListener struct {
+type PGListener struct {
 	conn    *pgxpool.Conn
 	channel string
 }
 
-func NewPgListner(ctx context.Context, pg *postgres.Postgres, channel string) (*PgListener, error) {
+func NewPGListener(ctx context.Context, pg *postgres.Postgres, channel string) (*PGListener, error) {
 	conn, err := pg.Pool.Acquire(ctx)
 	if err != nil {
 		return nil, err
@@ -23,13 +23,13 @@ func NewPgListner(ctx context.Context, pg *postgres.Postgres, channel string) (*
 	if err != nil {
 		return nil, err
 	}
-	return &PgListener{
+	return &PGListener{
 		conn:    conn,
 		channel: channel,
 	}, nil
 }
 
-func (pgl *PgListener) Listen(ctx context.Context, data chan<- string) {
+func (pgl *PGListener) Listen(ctx context.Context, data chan<- string) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -47,6 +47,6 @@ func (pgl *PgListener) Listen(ctx context.Context, data chan<- string) {
 	}
 }
 
-func (pgl *PgListener) Release() {
+func (pgl *PGListener) Release() {
 	pgl.conn.Release()
 }

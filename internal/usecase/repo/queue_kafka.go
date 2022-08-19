@@ -18,7 +18,8 @@ func NewQueueRepo(p *kafkaclient.Producer, c *kafkaclient.Consumer) *QueueRepo {
 	return &QueueRepo{producer: p, consumer: c}
 }
 
-func (q *QueueRepo) Store(number string) error {
+func (q *QueueRepo) Add(ctx context.Context, number string) error {
+	_ = ctx
 	return q.producer.Write(number)
 }
 
