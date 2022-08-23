@@ -7,20 +7,20 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/sreway/gophermart/internal/controller/listener"
 	"github.com/sreway/gophermart/internal/controller/processing"
-
 	"github.com/sreway/gophermart/internal/usecase/accrual"
+	"github.com/sreway/gophermart/internal/usecase/queue"
 	"github.com/sreway/gophermart/pkg/httpclient"
 	"github.com/sreway/gophermart/pkg/kafkaclient"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/sreway/gophermart/internal/controller/listener"
+
 	"github.com/sreway/gophermart/config"
 	"github.com/sreway/gophermart/internal/controller/http"
 	"github.com/sreway/gophermart/internal/usecase/balance"
 	"github.com/sreway/gophermart/internal/usecase/order"
-	"github.com/sreway/gophermart/internal/usecase/queue"
 	"github.com/sreway/gophermart/internal/usecase/repo"
 	"github.com/sreway/gophermart/internal/usecase/user"
 	"github.com/sreway/gophermart/internal/usecase/withdraw"
@@ -36,7 +36,6 @@ func Run(cfg *config.Config) {
 	signal.Notify(systemSignals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	exitChan := make(chan int)
 	newOrdersChan := make(chan string)
-
 	hc := httpclient.New(httpclient.WithBaseURL(cfg.Accrual.Address))
 
 	pg, err := postgres.New(ctx, cfg.Postgres.DSN)
@@ -48,7 +47,6 @@ func Run(cfg *config.Config) {
 	if err != nil {
 		logger.Fatal(err)
 	}
-
 	producer, err := kafkaclient.NewProducer(ctx, cfg.Kafka.BrokerNetwork, cfg.Kafka.BrokerAddress,
 		cfg.Kafka.Topic, cfg.Kafka.Partition)
 	if err != nil {
@@ -128,10 +126,9 @@ func Run(cfg *config.Config) {
 
 	exitCode := <-exitChan
 	cancel()
-	wg.Wait()
+
 	pgl.Release()
 	pg.Close()
-	producer.Close()
-	consumer.Close()
+
 	os.Exit(exitCode)
 }

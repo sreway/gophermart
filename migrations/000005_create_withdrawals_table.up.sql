@@ -8,4 +8,6 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     sum FLOAT DEFAULT 0
 );
 
+CREATE INDEX withdrawals_processed_at_id_idx ON withdrawals (processed_at, id);
+
 COMMIT;

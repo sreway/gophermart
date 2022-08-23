@@ -50,7 +50,7 @@ func (wr *WithdrawRepo) Add(ctx context.Context, withdraw *entity.Withdraw) erro
 	return tx.Commit(ctx)
 }
 
-func (wr *WithdrawRepo) GetAll(ctx context.Context, userID uint) ([]*entity.WithdrawOrder, error) {
+func (wr *WithdrawRepo) Get(ctx context.Context, userID uint) ([]*entity.WithdrawOrder, error) {
 	withdrawals := make([]*entity.WithdrawOrder, 0)
 	query := "select order_number, sum, processed_at from withdrawals WHERE user_id=$1 ORDER BY processed_at ASC"
 	row, err := wr.Postgres.Pool.Query(ctx, query, userID)
@@ -67,4 +67,26 @@ func (wr *WithdrawRepo) GetAll(ctx context.Context, userID uint) ([]*entity.With
 	}
 
 	return withdrawals, nil
+}
+
+func (wr *WithdrawRepo) GetPagination(ctx context.Context, userID, startAt, limit uint) (*entity.Withdrawals, error) {
+	withdrawals := entity.Withdrawals{}
+	query := `select id, order_number, sum, processed_at from withdrawals WHERE id > $2 AND user_id=$1
+				ORDER BY processed_at ASC, id ASC LIMIT $3;`
+	row, err := wr.Postgres.Pool.Query(ctx, query, userID, startAt, limit)
+	if err != nil {
+		return nil, err
+	}
+	for row.Next() {
+		w := entity.Withdraw{}
+
+		if err = row.Scan(&w.ID, &w.OrderNumber, &w.Sum, &w.ProcessedAt); err != nil {
+			return nil, err
+		}
+
+		withdrawals.Items = append(withdrawals.Items, &w)
+	}
+
+	withdrawals.PageSize = limit
+	return &withdrawals, nil
 }

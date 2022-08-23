@@ -13,9 +13,15 @@ type (
 	}
 
 	Withdraw struct {
-		ID     string `json:"id"`
-		UserID uint   `json:"user_id"`
+		ID     uint `json:"id"`
+		UserID uint `json:"user_id"`
 		WithdrawOrder
+	}
+
+	Withdrawals struct {
+		Items         []*Withdraw `json:"items"`
+		PageSize      uint        `json:"page_size"`
+		NextPageToken string      `json:"next_page_token,omitempty"`
 	}
 )
 

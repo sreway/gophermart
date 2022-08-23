@@ -40,11 +40,13 @@ type (
 	Withdraw interface {
 		Add(ctx context.Context, withdraw *entity.Withdraw) error
 		Get(ctx context.Context, userID uint) ([]*entity.WithdrawOrder, error)
+		GetPagination(ctx context.Context, userID uint, nextPageToken, pageSize string) (*entity.Withdrawals, error)
 	}
 
 	WithdrawRepo interface {
 		Add(ctx context.Context, withdraw *entity.Withdraw) error
-		GetAll(ctx context.Context, userID uint) ([]*entity.WithdrawOrder, error)
+		Get(ctx context.Context, userID uint) ([]*entity.WithdrawOrder, error)
+		GetPagination(ctx context.Context, userID, startAt, maxResults uint) (*entity.Withdrawals, error)
 	}
 
 	Accrual interface {

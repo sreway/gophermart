@@ -3,7 +3,6 @@ package http
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/sreway/gophermart/internal/entity"
@@ -65,20 +64,39 @@ func (wr *withdrawRoutes) withdrawGet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (wr *withdrawRoutes) withdrawGetPagination(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	userID := uint(r.Context().Value(userIDKey).(float64))
+	userLogin := r.Context().Value(userLoginKey).(string)
+
+	nextPageToken := r.URL.Query().Get("next_page_token")
+	pageSize := r.URL.Query().Get("page_size")
+
+	withdrawals, err := wr.withdraw.GetPagination(r.Context(), userID, nextPageToken, pageSize)
+	if err != nil {
+		HandelErrWithdraw(w, entity.NewErrWithdraw(userLogin, "all", err))
+		return
+	}
+
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "\t")
+	if err = encoder.Encode(&withdrawals); err != nil {
+		logger.Error(entity.NewErrWithdraw(userLogin, "all", err))
+		return
+	}
+}
+
 func HandelErrWithdraw(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, entity.ErrOrderNotFound):
-
 		w.WriteHeader(http.StatusOK)
 	case errors.Is(err, entity.ErrOrderIncorrectNumber):
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	case errors.Is(err, entity.ErrBalanceNotEnough):
 		w.WriteHeader(http.StatusPaymentRequired)
 	case errors.Is(err, entity.ErrWithdrawEmptyData):
-		fmt.Println("1")
 		w.WriteHeader(http.StatusNoContent)
 	default:
-
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	logger.Error(err)
