@@ -1,0 +1,10 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS balance(
+    id SERIAL PRIMARY KEY,
+    user_id SERIAL REFERENCES users(id) ON DELETE CASCADE,
+    balance float NOT NULL DEFAULT 0,
+    withdrawn float NOT NULL DEFAULT 0
+);
+
+COMMIT;

@@ -1,0 +1,12 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS orders(
+    id SERIAL PRIMARY KEY,
+    number VARCHAR(255) NOT NULL UNIQUE,
+    user_id SERIAL REFERENCES users(id) ON DELETE CASCADE,
+    status OrderStatus NOT NULL,
+    accrual float NOT NULL DEFAULT 0,
+    uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMIT;

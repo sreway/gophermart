@@ -9,10 +9,9 @@ on:
       - master
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
-    container: golang:1.17
+    container: golang:1.18
 
     services:
       postgres:
@@ -25,8 +24,11 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
-
     steps:
+# local kafka not work in tests(
+#      - name: Start Bitname Kafka
+#        uses: bbcCorp/kafka-actions@v1
+
       - name: Checkout code
         uses: actions/checkout@v2
 
