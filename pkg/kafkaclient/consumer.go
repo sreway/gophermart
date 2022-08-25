@@ -32,6 +32,14 @@ func (c *Consumer) Read(ctx context.Context) (*kafka.Message, error) {
 	return &msg, nil
 }
 
+func (c *Consumer) Fetch(ctx context.Context) (*kafka.Message, error) {
+	msg, err := c.r.FetchMessage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
 func (c *Consumer) Commit(ctx context.Context, msg *kafka.Message) error {
 	err := c.r.CommitMessages(ctx, *msg)
 	if err != nil {
