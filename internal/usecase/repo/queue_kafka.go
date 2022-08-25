@@ -24,7 +24,7 @@ func (q *QueueRepo) Add(ctx context.Context, number string) error {
 }
 
 func (q *QueueRepo) Read(ctx context.Context) (*entity.QueueMsg, error) {
-	msg, err := q.consumer.Read(ctx)
+	msg, err := q.consumer.Fetch(ctx)
 	if err != nil {
 		return nil, err
 	}
