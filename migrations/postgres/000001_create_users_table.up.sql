@@ -1,0 +1,9 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS users(
+    id uuid PRIMARY KEY,
+    login VARCHAR(255) NOT NULL UNIQUE,
+    hash_password VARCHAR(255) NOT NULL
+);
+
+COMMIT;
