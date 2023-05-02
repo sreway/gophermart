@@ -55,7 +55,7 @@ func init() {
 }
 
 func main() {
-	var code int
+	var exitCode int
 
 	log := slog.New(slog.NewJSONHandler(os.Stdout).
 		WithAttrs([]slog.Attr{slog.String("service", "gophermart")}),
@@ -65,25 +65,27 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer func() {
 		stop()
-		os.Exit(code)
+		os.Exit(exitCode)
 	}()
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
 	go func() {
-		defer wg.Done()
-
+		defer func() {
+			exit <- exitCode
+			wg.Done()
+		}()
 		cfg, err := config.New()
 		if err != nil {
 			log.Error("failed initialize config", slog.Any("err", err))
-			exit <- 1
+			exitCode = 1
 			return
 		}
 		storage, err := postgres.New(ctx, cfg.Storage())
 		if err != nil {
 			log.Error("failed initialize postgres repository", slog.Any("err", err))
-			exit <- 1
+			exitCode = 1
 			return
 		}
 		accrualRepo := accrual.New(cfg.Accrual())
@@ -94,11 +96,14 @@ func main() {
 		withdrawService := withdraw.New(storage)
 
 		go func() {
-			defer wg.Done()
+			defer func() {
+				exit <- exitCode
+				wg.Done()
+			}()
 			err = orderService.ProcNewOrder(ctx, cfg.Orders())
 			if err != nil {
 				log.Error("failed processing new order", slog.Any("err", err))
-				exit <- 1
+				exitCode = 1
 				return
 			}
 		}()
@@ -107,18 +112,17 @@ func main() {
 		err = httpServer.Run(ctx)
 		if err != nil {
 			log.Error("failed run http server", slog.Any("err", err))
-			exit <- 1
+			exitCode = 1
 			return
 		}
 	}()
 
 	go func() {
 		<-ctx.Done()
-		stop()
-		exit <- 0
+		exit <- exitCode
 		log.Info("trigger graceful shutdown app")
 	}()
 
-	code = <-exit
+	<-exit
 	wg.Done()
 }
