@@ -61,7 +61,7 @@ func main() {
 		WithAttrs([]slog.Attr{slog.String("service", "gophermart")}),
 	)
 
-	exit := make(chan int)
+	exit := make(chan struct{})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer func() {
 		stop()
@@ -73,7 +73,7 @@ func main() {
 
 	go func() {
 		defer func() {
-			exit <- exitCode
+			exit <- struct{}{}
 			wg.Done()
 		}()
 		cfg, err := config.New()
@@ -97,7 +97,7 @@ func main() {
 
 		go func() {
 			defer func() {
-				exit <- exitCode
+				exit <- struct{}{}
 				wg.Done()
 			}()
 			err = orderService.ProcNewOrder(ctx, cfg.Orders())
@@ -119,7 +119,7 @@ func main() {
 
 	go func() {
 		<-ctx.Done()
-		exit <- exitCode
+		exit <- struct{}{}
 		log.Info("trigger graceful shutdown app")
 	}()
 
