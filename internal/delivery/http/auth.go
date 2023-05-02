@@ -13,12 +13,8 @@ type (
 		UserLogin string `json:"user_login"`
 		jwt.RegisteredClaims
 	}
-	ctxKey string
-)
-
-const (
-	ctxUserID    ctxKey = "user_id"
-	ctxUserLogin ctxKey = "user_login"
+	ctxUserID    struct{}
+	ctxUserLogin struct{}
 )
 
 func ValidateCookieToken(jwtSecretKey, jwtCookieName string) func(http.Handler) http.Handler {
@@ -46,8 +42,8 @@ func ValidateCookieToken(jwtSecretKey, jwtCookieName string) func(http.Handler) 
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), ctxUserID, claim.UserID)
-			ctx = context.WithValue(ctx, ctxUserLogin, claim.UserLogin)
+			ctx := context.WithValue(r.Context(), ctxUserID{}, claim.UserID)
+			ctx = context.WithValue(ctx, ctxUserLogin{}, claim.UserLogin)
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})

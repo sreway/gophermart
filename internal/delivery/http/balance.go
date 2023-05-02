@@ -13,7 +13,7 @@ import (
 
 func (d *delivery) balanceGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userID, err := uuid.Parse(r.Context().Value(ctxUserID).(string))
+	userID, err := uuid.Parse(r.Context().Value(ctxUserID{}).(string))
 	if err != nil {
 		d.logger.Error("failed parse user id from context", slog.Any("err", err),
 			slog.String("handler", "balanceGet"))
