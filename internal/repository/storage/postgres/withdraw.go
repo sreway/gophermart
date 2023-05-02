@@ -72,5 +72,5 @@ func (r *repo) GetWithdraw(ctx context.Context, userID uuid.UUID) ([]domain.With
 		withdrawals = append(withdrawals, *withdraw)
 	}
 
-	return withdrawals, nil
+	return withdrawals, row.Err()
 }

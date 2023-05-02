@@ -117,7 +117,7 @@ func (r *repo) GetUserOrders(ctx context.Context, userID uuid.UUID) ([]domain.Or
 		orders = append(orders, *order)
 	}
 
-	return orders, nil
+	return orders, row.Err()
 }
 
 func (r *repo) RefillBalance(ctx context.Context, userID uuid.UUID, value float64) error {
